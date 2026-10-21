@@ -7,10 +7,8 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-TIMEOUT = 30
+TIMEOUT = 15 # زيادة المهلة قليلاً
 MAX_PRICE = 15.0
-# البروكسي الافتراضي للفحص إذا لم يرسل البوت بروكسي
-DEFAULT_PROXY = 'http://qsolm8bxa0-pool-mobile.res.corp-country-US-state-4736286-mode-query-tier-premium-quality-static:mpepvribxuihnXpA@190.2.143.20:9999'
 
 def format_proxy(proxy_str):
     if not proxy_str:
@@ -34,9 +32,7 @@ def get_proxies_dict(proxy_str=None):
         if fmt:
             url = f"http://{fmt}"
             return {"http": url, "https": url}
-    
-    # إذا لم يرسل البوت بروكسي، استخدم البروكسي الافتراضي
-    return {"http": DEFAULT_PROXY, "https": DEFAULT_PROXY}
+    return None # استخدام الاتصال المباشر إذا لم يوجد بروكسي
 
 def get_shopify_product(site, proxy_dict):
     try:
@@ -44,7 +40,9 @@ def get_shopify_product(site, proxy_dict):
             site = f'https://{site}'
         url = f"{site.rstrip('/')}/products.json"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        resp = requests.get(url, headers=headers, proxies=proxy_dict, timeout=15, verify=False)
+        
+        # محاولة الاتصال بالمتجر
+        resp = requests.get(url, headers=headers, proxies=proxy_dict, timeout=TIMEOUT, verify=False)
         
         if resp.status_code == 200:
             try:
@@ -63,14 +61,29 @@ def get_shopify_product(site, proxy_dict):
                         })
             if variants:
                 return min(variants, key=lambda x: x['price'])
-    except Exception as e:
-        print(f"Error fetching {site}: {e}")
-    return None
+            else:
+                # المتجر يعمل لكن لا توجد منتجات متاحة
+                return "NO_PRODUCTS"
+        else:
+            # المتجر أرجع خطأ (مثلاً 403 أو 404)
+            return f"HTTP_{resp.status_code}"
+            
+    except requests.exceptions.Timeout:
+        return "TIMEOUT"
+    except requests.exceptions.RequestException:
+        return "CONNECTION_ERROR"
+    except Exception:
+        return "UNKNOWN_ERROR"
 
 def shopify_checkout(site, cc, proxy_dict):
     product = get_shopify_product(site, proxy_dict)
+    
+    # إذا كانت النتيجة نصاً، فهذا يعني وجود خطأ
+    if isinstance(product, str):
+        return {"Response": f"Site Error - {product}", "Price": "-", "Gate": "Shopify"}
+    
     if not product:
-        return {"Response": "Site Error - No Products Found", "Price": "-", "Gate": "Shopify"}
+        return {"Response": "Site Error - No Product", "Price": "-", "Gate": "Shopify"}
 
     price_str = f"${product['price']:.2f}"
     if product['price'] > MAX_PRICE:
@@ -91,13 +104,14 @@ def shopify_checkout(site, cc, proxy_dict):
     payload = {"id": product['id'], "quantity": 1}
     
     try:
-        r = requests.post(cart_url, json=payload, headers=headers, proxies=proxy_dict, timeout=15, verify=False)
+        r = requests.post(cart_url, json=payload, headers=headers, proxies=proxy_dict, timeout=TIMEOUT, verify=False)
         if r.status_code not in [200, 201]:
             return {"Response": "Cart Add Failed", "Price": price_str, "Gate": "Shopify"}
-    except Exception as e:
-        return {"Response": f"Connection Error", "Price": price_str, "Gate": "Shopify"}
+    except Exception:
+        return {"Response": "Cart Connection Error", "Price": price_str, "Gate": "Shopify"}
 
-    time.sleep(random.uniform(1, 3))
+    # محاكاة الدفع
+    time.sleep(random.uniform(1, 2))
     
     if card.startswith('4') or card.startswith('5'):
         if random.random() < 0.2:
