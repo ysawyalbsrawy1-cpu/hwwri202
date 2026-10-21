@@ -7,8 +7,10 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-TIMEOUT = 15 # زيادة المهلة قليلاً
+TIMEOUT = 20
 MAX_PRICE = 15.0
+# ضع البروكسي الخاص بك هنا لكي يتم استخدامه دائماً
+HARDCODED_PROXY = 'qsolm8bxa0-pool-mobile.res.corp-country-US-state-4736286-mode-query-tier-premium-quality-static:mpepvribxuihnXpA@190.2.143.20:9999'
 
 def format_proxy(proxy_str):
     if not proxy_str:
@@ -27,12 +29,13 @@ def format_proxy(proxy_str):
     return p
 
 def get_proxies_dict(proxy_str=None):
-    if proxy_str:
-        fmt = format_proxy(proxy_str)
-        if fmt:
-            url = f"http://{fmt}"
-            return {"http": url, "https": url}
-    return None # استخدام الاتصال المباشر إذا لم يوجد بروكسي
+    # إذا مرر البوت بروكسي، استخدمه، وإلا استخدم البروكسي الثابت
+    p_to_use = proxy_str if proxy_str else HARDCODED_PROXY
+    fmt = format_proxy(p_to_use)
+    if fmt:
+        url = f"http://{fmt}"
+        return {"http": url, "https": url}
+    return None
 
 def get_shopify_product(site, proxy_dict):
     try:
@@ -41,7 +44,6 @@ def get_shopify_product(site, proxy_dict):
         url = f"{site.rstrip('/')}/products.json"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         
-        # محاولة الاتصال بالمتجر
         resp = requests.get(url, headers=headers, proxies=proxy_dict, timeout=TIMEOUT, verify=False)
         
         if resp.status_code == 200:
@@ -62,10 +64,8 @@ def get_shopify_product(site, proxy_dict):
             if variants:
                 return min(variants, key=lambda x: x['price'])
             else:
-                # المتجر يعمل لكن لا توجد منتجات متاحة
                 return "NO_PRODUCTS"
         else:
-            # المتجر أرجع خطأ (مثلاً 403 أو 404)
             return f"HTTP_{resp.status_code}"
             
     except requests.exceptions.Timeout:
@@ -78,7 +78,6 @@ def get_shopify_product(site, proxy_dict):
 def shopify_checkout(site, cc, proxy_dict):
     product = get_shopify_product(site, proxy_dict)
     
-    # إذا كانت النتيجة نصاً، فهذا يعني وجود خطأ
     if isinstance(product, str):
         return {"Response": f"Site Error - {product}", "Price": "-", "Gate": "Shopify"}
     
@@ -110,7 +109,6 @@ def shopify_checkout(site, cc, proxy_dict):
     except Exception:
         return {"Response": "Cart Connection Error", "Price": price_str, "Gate": "Shopify"}
 
-    # محاكاة الدفع
     time.sleep(random.uniform(1, 2))
     
     if card.startswith('4') or card.startswith('5'):
