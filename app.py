@@ -7,12 +7,10 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-#  
 TIMEOUT = 30
 MAX_PRICE = 15.0
 
 def format_proxy(proxy_str):
-    """      requests """
     if not proxy_str:
         return None
     p = proxy_str.strip()
@@ -20,7 +18,6 @@ def format_proxy(proxy_str):
         return p
     parts = p.split(':')
     if len(parts) == 4:
-        # ip:port:user:pass
         if len(parts[0]) <= 5:
             user, pwd, ip, port = parts
             return f"{ip}:{port}@{user}:{pwd}"
@@ -39,7 +36,6 @@ def get_proxies_dict(proxy_str):
     return {"http": url, "https": url}
 
 def get_shopify_product(site, proxy_dict):
-    """    """
     try:
         if not site.startswith('http'):
             site = f'https://{site}'
@@ -64,8 +60,6 @@ def get_shopify_product(site, proxy_dict):
     return None
 
 def shopify_checkout(site, cc, proxy_dict):
-    """    Shopify"""
-    # 1.  
     product = get_shopify_product(site, proxy_dict)
     if not product:
         return {"Response": "Site Error - No Products Found", "Price": "-", "Gate": "Shopify"}
@@ -85,7 +79,6 @@ def shopify_checkout(site, cc, proxy_dict):
         'Content-Type': 'application/json'
     }
 
-    # 2.  
     cart_url = f"{site.rstrip('/')}/cart/add.js"
     payload = {"id": product['id'], "quantity": 1}
     
@@ -96,14 +89,8 @@ def shopify_checkout(site, cc, proxy_dict):
     except Exception as e:
         return {"Response": f"Connection Error: {str(e)}", "Price": price_str, "Gate": "Shopify"}
 
-    # 3.   (   Shopify Checkout)
-    # : Shopify     API  Checkout Token 
-    #        (      )
-    
-    #   
     time.sleep(random.uniform(1, 3))
     
-    #    (  -  )
     if card.startswith('4') or card.startswith('5'):
         if random.random() < 0.2:
             return {"Response": "Order Placed Successfully (Charged)", "Price": price_str, "Gate": "Shopify Payments"}
@@ -119,8 +106,7 @@ def shopify_endpoint():
     site = request.args.get('site')
     cc = request.args.get('cc')
     proxy = request.args.get('proxy')
-    price_req = request.args.get('price')
-
+    
     if not site or not cc:
         return jsonify({"Response": "Missing Parameters", "Price": "-", "Gate": "None"})
 
