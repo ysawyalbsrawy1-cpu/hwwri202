@@ -2,10 +2,8 @@ import os
 import time
 import random
 import json
-import zipfile
-import tempfile
 from flask import Flask, request, jsonify
-from selenium import webdriver
+from seleniumwire import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -16,50 +14,32 @@ from webdriver_manager.chrome import ChromeDriverManager
 app = Flask(__name__)
 MAX_PRICE = 15.0
 
-def create_proxy_extension(proxy):
-    if not proxy or '@' not in proxy: return None
-    p = proxy.replace("http://", "").replace("https://", "")
-    user_pass, host_port = p.split('@')
-    user, pwd = user_pass.split(':')
-    host, port = host_port.split(':')
-    
-    manifest_json = """
-    {
-        "version": "1.0.0", "manifest_version": 2, "name": "Chrome Proxy",
-        "permissions": ["proxy", "tabs", "unlimitedStorage", "storage", "<all_urls>", "webRequest", "webRequestBlocking"],
-        "background": { "scripts": ["background.js"] }, "minimum_chrome_version": "22.0.0"
-    }
-    """
-    background_js = """
-    var config = { mode: "fixed_servers", rules: { singleProxy: { scheme: "http", host: "%s", port: parseInt("%s") }, bypassList: ["localhost"] } };
-    chrome.proxy.settings.set({value: config, scope: "regular"}, function() {});
-    function callbackFn(details) { return { authCredentials: { username: "%s", password: "%s" } }; }
-    chrome.webRequest.onAuthRequired.addListener(callbackFn, {urls: ["<all_urls>"]}, ['blocking']);
-    """ % (host, port, user, pwd)
-
-    plugin_file = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
-    with zipfile.ZipFile(plugin_file.name, 'w') as zp:
-        zp.writestr("manifest.json", manifest_json)
-        zp.writestr("background.js", background_js)
-    return plugin_file.name
-
 def setup_driver(proxy=None):
     chrome_options = Options()
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("--headless=new") # هام جداً لـ GitHub
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
 
+    seleniumwire_options = {}
     if proxy:
-        ext_file = create_proxy_extension(proxy)
-        if ext_file: 
-            chrome_options.add_extension(ext_file)
+        seleniumwire_options = {
+            'proxy': {
+                'http': proxy,
+                'https': proxy,
+                'no_proxy': 'localhost,127.0.0.1'
+            }
+        }
 
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    driver = webdriver.Chrome(
+        service=Service(ChromeDriverManager().install()),
+        options=chrome_options,
+        seleniumwire_options=seleniumwire_options
+    )
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     return driver
 
