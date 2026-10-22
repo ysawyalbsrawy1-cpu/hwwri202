@@ -24,7 +24,7 @@ jobs:
     - name: Run App in Background
       run: |
         python app.py &
-        sleep 10
+        sleep 35
 
     - name: Test Store 1 (OMG Party)
       run: |
