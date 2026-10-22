@@ -26,18 +26,6 @@ jobs:
         python app.py &
         sleep 10
 
-    - name: Test Store 1 (Cremo - $0.01)
-      run: |
-        curl "http://127.0.0.1:5000/shopify?site=https://cremo-us.myshopify.com&cc=5556960016096713|11|2027|960&proxy=http://mvzmpajhau-pool-mobile.res.corp-country-US-state-4736286-mode-hold-tier-premium-quality-static-session-6ada32c04cc9e:PE4gCi6EolhyTwLe@212.8.249.142:9999"
-
-    - name: Test Store 2 (Creative Cookier - $1.75)
-      run: |
-        curl "http://127.0.0.1:5000/shopify?site=https://creativecookier-com.myshopify.com&cc=5556960016096713|11|2027|960&proxy=http://mvzmpajhau-pool-mobile.res.corp-country-US-state-4736286-mode-hold-tier-premium-quality-static-session-6ada32c04cc9e:PE4gCi6EolhyTwLe@212.8.249.142:9999"
-
-    - name: Test Store 3 (Crimson and Clover - $3.0)
-      run: |
-        curl "http://127.0.0.1:5000/shopify?site=https://crimsonandclover.myshopify.com&cc=5556960016096713|11|2027|960&proxy=http://mvzmpajhau-pool-mobile.res.corp-country-US-state-4736286-mode-hold-tier-premium-quality-static-session-6ada32c04cc9e:PE4gCi6EolhyTwLe@212.8.249.142:9999"
-
-    - name: Test Store 4 (Crownline Apparel - $3.0)
+    - name: Test Single Store (Crownline Apparel)
       run: |
         curl "http://127.0.0.1:5000/shopify?site=https://crownline-apparel.myshopify.com&cc=5556960016096713|11|2027|960&proxy=http://mvzmpajhau-pool-mobile.res.corp-country-US-state-4736286-mode-hold-tier-premium-quality-static-session-6ada32c04cc9e:PE4gCi6EolhyTwLe@212.8.249.142:9999"
