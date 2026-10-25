@@ -11,7 +11,7 @@ import re
 import time
 import uuid
 import logging
-import os  # <--- تم إضافة هذا السطر لقراءة منفذ Railway
+import os
 from typing import Optional
 
 import httpx
@@ -406,16 +406,44 @@ async def shopify(
             "proxy_used": True, "proxy_live": proxy_live,
         })
 
-    return {
-        "status": bool(result.get("status")),
-        "message": result.get("message", "CARD_DECLINED"),
-        "gateway": "Shopify Payments",
-        "price": result.get("price", "0.99"),
-        "currency": result.get("currency", "USD"),
-        "time_taken": f"{round(time.time()-t0, 2)}s",
-        "proxy_used": True,
-        "proxy_live": proxy_live,
-    }
+    # ============================================================
+    #  بناء الاستجابة النهائية لتطابق المطلوب تماماً
+    # ============================================================
+    if result.get("class") == "CHARGED":
+        final_response = {
+            "status": True,
+            "message": "Order Confirm",
+            "gateway": "Shopify Payments",
+            "price": result.get("price", "0.99"),
+            "currency": "USD",
+            "time_taken": f"{round(time.time()-t0, 2)}s",
+            "proxy_used": True,
+            "proxy_live": proxy_live
+        }
+    elif result.get("class") == "LIVE":
+        final_response = {
+            "status": True,
+            "message": result.get("message", "INSUFFICIENT_FUNDS"),
+            "gateway": "Shopify Payments",
+            "price": result.get("price", "0.99"),
+            "currency": "USD",
+            "time_taken": f"{round(time.time()-t0, 2)}s",
+            "proxy_used": True,
+            "proxy_live": proxy_live
+        }
+    else: # DEAD
+        final_response = {
+            "status": False,
+            "message": result.get("message", "CARD_DECLINED"),
+            "gateway": "Shopify Payments",
+            "price": result.get("price", "0.99"),
+            "currency": "USD",
+            "time_taken": f"{round(time.time()-t0, 2)}s",
+            "proxy_used": True,
+            "proxy_live": proxy_live
+        }
+
+    return final_response
 
 
 @app.get("/health")
@@ -425,6 +453,5 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
-    # Railway يحدد المنفذ تلقائياً عبر متغير PORT
-    port = int(os.environ.get("PORT", 5000))
-    uvicorn.run("app:app", host="0.0.0.0", port=port, workers=1, log_level="info")
+    # تشغيل التطبيق على المنفذ 5000 كما طلبت
+    uvicorn.run("app:app", host="0.0.0.0", port=5000, workers=1, log_level="info")
