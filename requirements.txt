@@ -1,5 +1,3 @@
-Flask
-selenium
-webdriver-manager
-requests
-selenium-wire
+fastapi
+uvicorn
+httpx
