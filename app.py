@@ -1,4 +1,4 @@
-# app.py — v4.0 (High-accuracy classification)
+# app.py — v4.1 (Proxy Fix)
 # ============================================================
 #  SHOPIFY CHECKER API
 #  GET /shopify?site=...&cc=...&proxy=...
@@ -12,6 +12,7 @@ import time
 import uuid
 import logging
 import os
+import requests # أضفنا requests لفحص البروكسي
 from typing import Optional
 
 import httpx
@@ -21,7 +22,7 @@ from fastapi.responses import JSONResponse
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("shopify-api")
 
-app = FastAPI(title="Shopify Checker API", version="4.0.0")
+app = FastAPI(title="Shopify Checker API", version="4.1.0")
 
 UPSTREAM_TIMEOUT = 90
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -171,16 +172,20 @@ def classify_shopify_response(url_str: str, body: str, http_status: int) -> dict
 
 
 # ============================================================
-#  proxy live-check
+#  proxy live-check (تم تعديلها لتستخدم requests)
 # ============================================================
-async def proxy_is_alive(proxy: dict) -> bool:
+def proxy_is_alive_sync(proxy: dict) -> bool:
     try:
-        async with httpx.AsyncClient(proxy=proxy_url(proxy), verify=False,
-                                     timeout=8) as c:
-            r = await c.get("https://api.ipify.org?format=json")
-            return r.status_code == 200
-    except Exception:
+        url = proxy_url(proxy)
+        proxies = {"http": url, "https": url}
+        r = requests.get("https://api.ipify.org?format=json", proxies=proxies, timeout=10, verify=False)
+        return r.status_code == 200
+    except Exception as e:
+        log.warning(f"Proxy check failed: {e}")
         return False
+
+async def proxy_is_alive(proxy: dict) -> bool:
+    return await asyncio.to_thread(proxy_is_alive_sync, proxy)
 
 
 # ============================================================
@@ -407,40 +412,28 @@ async def shopify(
         })
 
     # ============================================================
-    #  بناء الاستجابة النهائية لتطابق المطلوب تماماً
+    #  بناء الاستجابة النهائية
     # ============================================================
     if result.get("class") == "CHARGED":
         final_response = {
-            "status": True,
-            "message": "Order Confirm",
-            "gateway": "Shopify Payments",
-            "price": result.get("price", "0.99"),
-            "currency": "USD",
-            "time_taken": f"{round(time.time()-t0, 2)}s",
-            "proxy_used": True,
-            "proxy_live": proxy_live
+            "status": True, "message": "Order Confirm",
+            "gateway": "Shopify Payments", "price": result.get("price", "0.99"),
+            "currency": "USD", "time_taken": f"{round(time.time()-t0, 2)}s",
+            "proxy_used": True, "proxy_live": proxy_live
         }
     elif result.get("class") == "LIVE":
         final_response = {
-            "status": True,
-            "message": result.get("message", "INSUFFICIENT_FUNDS"),
-            "gateway": "Shopify Payments",
-            "price": result.get("price", "0.99"),
-            "currency": "USD",
-            "time_taken": f"{round(time.time()-t0, 2)}s",
-            "proxy_used": True,
-            "proxy_live": proxy_live
+            "status": True, "message": result.get("message", "INSUFFICIENT_FUNDS"),
+            "gateway": "Shopify Payments", "price": result.get("price", "0.99"),
+            "currency": "USD", "time_taken": f"{round(time.time()-t0, 2)}s",
+            "proxy_used": True, "proxy_live": proxy_live
         }
     else: # DEAD
         final_response = {
-            "status": False,
-            "message": result.get("message", "CARD_DECLINED"),
-            "gateway": "Shopify Payments",
-            "price": result.get("price", "0.99"),
-            "currency": "USD",
-            "time_taken": f"{round(time.time()-t0, 2)}s",
-            "proxy_used": True,
-            "proxy_live": proxy_live
+            "status": False, "message": result.get("message", "CARD_DECLINED"),
+            "gateway": "Shopify Payments", "price": result.get("price", "0.99"),
+            "currency": "USD", "time_taken": f"{round(time.time()-t0, 2)}s",
+            "proxy_used": True, "proxy_live": proxy_live
         }
 
     return final_response
@@ -453,6 +446,4 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
-    # تشغيل التطبيق على المنفذ الديناميكي الذي توفره منصة Railway
-    port = int(os.getenv("PORT", 5000))
-    uvicorn.run("app:app", host="0.0.0.0", port=port, workers=1, log_level="info")
+    uvicorn.run("app:app", host="0.0.0.0", port=5000, workers=1, log_level="info")
