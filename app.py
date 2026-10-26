@@ -1,10 +1,4 @@
-# app.py — v4.1 (Proxy Fix)
-# ============================================================
-#  SHOPIFY CHECKER API
-#  GET /shopify?site=...&cc=...&proxy=...
-#  Classification based on Shopify's OFFICIAL error codes only.
-# ============================================================
-
+# app.py — v4.2 (httpx fix)
 import asyncio
 import json
 import re
@@ -12,7 +6,6 @@ import time
 import uuid
 import logging
 import os
-import requests # أضفنا requests لفحص البروكسي
 from typing import Optional
 
 import httpx
@@ -22,7 +15,7 @@ from fastapi.responses import JSONResponse
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("shopify-api")
 
-app = FastAPI(title="Shopify Checker API", version="4.1.0")
+app = FastAPI(title="Shopify Checker API", version="4.2.0")
 
 UPSTREAM_TIMEOUT = 90
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -172,20 +165,18 @@ def classify_shopify_response(url_str: str, body: str, http_status: int) -> dict
 
 
 # ============================================================
-#  proxy live-check (تم تعديلها لتستخدم requests)
+#  proxy live-check (تم تعديلها لتعمل بـ httpx)
 # ============================================================
-def proxy_is_alive_sync(proxy: dict) -> bool:
+async def proxy_is_alive(proxy: dict) -> bool:
     try:
-        url = proxy_url(proxy)
-        proxies = {"http": url, "https": url}
-        r = requests.get("https://api.ipify.org?format=json", proxies=proxies, timeout=10, verify=False)
-        return r.status_code == 200
+        # نستخدم httpx مع verify=False
+        transport = httpx.AsyncHTTPTransport(proxy=proxy_url(proxy), verify=False)
+        async with httpx.AsyncClient(transport=transport, timeout=10) as c:
+            r = await c.get("https://api.ipify.org?format=json")
+            return r.status_code == 200
     except Exception as e:
         log.warning(f"Proxy check failed: {e}")
         return False
-
-async def proxy_is_alive(proxy: dict) -> bool:
-    return await asyncio.to_thread(proxy_is_alive_sync, proxy)
 
 
 # ============================================================
@@ -324,8 +315,10 @@ async def submit_payment(client: httpx.AsyncClient, base: str, token: str,
 async def run_checkout(site: str, card: dict, proxy: dict) -> dict:
     base = f"https://{site}"
 
-    async with httpx.AsyncClient(proxy=proxy_url(proxy), verify=False,
-                                 follow_redirects=True,
+    # إصلاح الجلسة لاستخدام النقل (Transport) بدلاً من proxy مباشرة لتفادي أخطاء SSL
+    transport = httpx.AsyncHTTPTransport(proxy=proxy_url(proxy), verify=False)
+    
+    async with httpx.AsyncClient(transport=transport, follow_redirects=True,
                                  headers={"User-Agent": UA}) as client:
         variant = await pick_variant(client, base)
         if not variant:
