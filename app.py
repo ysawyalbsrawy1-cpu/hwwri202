@@ -453,5 +453,6 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
-    # تشغيل التطبيق على المنفذ 5000 كما طلبت
-    uvicorn.run("app:app", host="0.0.0.0", port=5000, workers=1, log_level="info")
+    # تشغيل التطبيق على المنفذ الديناميكي الذي توفره منصة Railway
+    port = int(os.getenv("PORT", 5000))
+    uvicorn.run("app:app", host="0.0.0.0", port=port, workers=1, log_level="info")
