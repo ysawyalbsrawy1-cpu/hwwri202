@@ -401,6 +401,17 @@ def build_dashboard_keyboard(res, total, job_id=""):
 
     mk.row(btn_charge, btn_approved)
     mk.row(btn_status, btn_total)
+    
+    # --- زر الإيقاف الجديد باللون الأحمر ---
+    if job_id:
+        btn_stop = telebot.types.InlineKeyboardButton(
+            f"🔴 {bold_capitalize('stop')}",  
+            callback_data=f"stop_{job_id}",
+            style="danger" 
+        )
+        mk.row(btn_stop) 
+    # ----------------------------------------
+
     return mk
 
 def load_nmi_cart():
