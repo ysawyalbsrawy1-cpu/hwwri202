@@ -1,4 +1,0 @@
-pyTelegramBotAPI
-faker
-curl_cffi
-requests
