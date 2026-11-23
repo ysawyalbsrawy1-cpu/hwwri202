@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: shopify-checker-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: oregon
+    envVars:
+      - key: PORT
+        value: "8081"
+      # GC runs less often → lower CPU under sustained load.
+      # 400 = GC fires when heap doubles. Good for I/O-heavy workloads.
+      - key: GOGC
+        value: "400"
+      # Hard memory cap — prevents OOM kill on the container.
+      # Set to ~85% of the plan's RAM. Adjust if you upgrade the plan.
+      # Render starter = 2 GB → 1700 MiB leaves room for non-Go overhead.
+      # For the 24 GB Ender VPS, override this to "20GiB" via env var.
+      - key: GOMEMLIMIT
+        value: "1700MiB"
+    # ── CRITICAL FIX ────────────────────────────────────────────────────────
+    # Previously pointed at "/" which calls handleCheck, needs a CC,
+    # returns HTTP 400, Render marks the service UNHEALTHY, and the
+    # load-balancer stops routing traffic → cascading 503s.
+    # "/health" returns 200 unconditionally with live stats.
+    healthCheckPath: /health

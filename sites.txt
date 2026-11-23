@@ -1,0 +1,1 @@
+# one domain per line, e.g. example.myshopify.com
